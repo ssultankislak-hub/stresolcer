@@ -1,0 +1,1229 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#0a0a0f">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="NabızStres">
+<link rel="manifest" href="manifest.json">
+<title>NabızStres – Kan Akışı Stres Ölçümü</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500;1,300&family=Fraunces:ital,opsz,wght@0,9..144,200;0,9..144,300;1,9..144,200&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #06060a;
+    --surface: #0f0f18;
+    --surface2: #16162299;
+    --border: #ffffff12;
+    --red: #e8392a;
+    --red-soft: #e8392a44;
+    --red-glow: #e8392a22;
+    --amber: #f5a623;
+    --green: #2de08b;
+    --blue: #4a9eff;
+    --text: #f0ede8;
+    --text-dim: #8885a0;
+    --text-faint: #44424e;
+    --radius: 20px;
+    --radius-sm: 12px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Mono', monospace;
+    min-height: 100dvh;
+    overflow-x: hidden;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* Animated background */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background:
+      radial-gradient(ellipse 60% 40% at 20% 0%, #e8392a0d 0%, transparent 60%),
+      radial-gradient(ellipse 40% 30% at 80% 100%, #4a9eff08 0%, transparent 50%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .app {
+    position: relative;
+    z-index: 1;
+    max-width: 430px;
+    margin: 0 auto;
+    padding: 0 0 80px;
+    min-height: 100dvh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* Header */
+  header {
+    padding: 52px 24px 20px;
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+  }
+
+  .logo {
+    font-family: 'Fraunces', serif;
+    font-size: 26px;
+    font-weight: 200;
+    font-style: italic;
+    letter-spacing: -0.5px;
+    color: var(--text);
+  }
+  .logo span { color: var(--red); font-style: normal; }
+
+  .status-pill {
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 5px 12px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    background: var(--surface2);
+    transition: all 0.4s;
+  }
+  .status-pill.active {
+    border-color: var(--red-soft);
+    color: var(--red);
+    background: var(--red-glow);
+    box-shadow: 0 0 12px var(--red-glow);
+  }
+
+  /* Main camera section */
+  .camera-section {
+    padding: 0 24px;
+    margin-bottom: 24px;
+  }
+
+  .camera-card {
+    position: relative;
+    border-radius: var(--radius);
+    overflow: hidden;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    aspect-ratio: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  #videoEl {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+    transform: scaleX(-1);
+  }
+
+  .camera-overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(to bottom, transparent 40%, var(--bg)cc);
+  }
+
+  /* Pulse ring animation */
+  .pulse-rings {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.5s;
+  }
+  .pulse-rings.visible { opacity: 1; }
+  .ring {
+    position: absolute;
+    border-radius: 50%;
+    border: 1.5px solid var(--red);
+    animation: ripple 2s ease-out infinite;
+  }
+  .ring:nth-child(1) { width: 80px; height: 80px; animation-delay: 0s; }
+  .ring:nth-child(2) { width: 140px; height: 140px; animation-delay: 0.4s; }
+  .ring:nth-child(3) { width: 200px; height: 200px; animation-delay: 0.8s; }
+  @keyframes ripple {
+    0% { opacity: 0.7; transform: scale(0.95); }
+    100% { opacity: 0; transform: scale(1.05); }
+  }
+
+  /* Idle state */
+  .idle-prompt {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    padding: 32px;
+    text-align: center;
+    transition: opacity 0.3s;
+  }
+  .idle-prompt.hidden { opacity: 0; pointer-events: none; }
+
+  .finger-icon {
+    font-size: 52px;
+    line-height: 1;
+    filter: drop-shadow(0 0 20px var(--red-soft));
+    animation: float 3s ease-in-out infinite;
+  }
+  @keyframes float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-6px); }
+  }
+
+  .idle-label {
+    font-size: 13px;
+    color: var(--text-dim);
+    line-height: 1.6;
+    font-weight: 300;
+  }
+
+  /* Live readout */
+  .live-readout {
+    position: absolute;
+    bottom: 20px;
+    left: 20px;
+    right: 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    opacity: 0;
+    transition: opacity 0.5s;
+  }
+  .live-readout.visible { opacity: 1; }
+
+  .readout-bpm {
+    display: flex;
+    flex-direction: column;
+  }
+  .readout-bpm .val {
+    font-family: 'Fraunces', serif;
+    font-size: 48px;
+    font-weight: 200;
+    line-height: 1;
+    color: var(--red);
+    text-shadow: 0 0 30px var(--red-soft);
+  }
+  .readout-bpm .unit {
+    font-size: 10px;
+    color: var(--text-dim);
+    letter-spacing: 0.1em;
+    margin-top: 2px;
+  }
+
+  .readout-quality {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 4px;
+  }
+  .quality-dots {
+    display: flex;
+    gap: 4px;
+  }
+  .qdot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--border);
+    transition: background 0.3s;
+  }
+  .qdot.lit { background: var(--green); box-shadow: 0 0 6px var(--green); }
+  .quality-label { font-size: 10px; color: var(--text-dim); }
+
+  /* Canvas for PPG signal (hidden, used for computation) */
+  #canvasEl { display: none; }
+
+  /* Waveform display */
+  .waveform-section {
+    padding: 0 24px;
+    margin-bottom: 20px;
+  }
+
+  .waveform-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px 20px;
+    overflow: hidden;
+  }
+
+  .waveform-label {
+    font-size: 10px;
+    color: var(--text-faint);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    margin-bottom: 12px;
+  }
+
+  #waveformCanvas {
+    width: 100%;
+    height: 64px;
+    display: block;
+    border-radius: 6px;
+  }
+
+  /* Stats row */
+  .stats-section {
+    padding: 0 24px;
+    margin-bottom: 20px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+
+  .stat-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 16px;
+    position: relative;
+    overflow: hidden;
+    transition: border-color 0.4s;
+  }
+  .stat-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    border-radius: 2px 2px 0 0;
+    background: var(--accent, var(--border));
+    opacity: 0.6;
+    transition: opacity 0.4s;
+  }
+  .stat-card.active::before { opacity: 1; }
+
+  .stat-label {
+    font-size: 9px;
+    color: var(--text-faint);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+  .stat-value {
+    font-family: 'Fraunces', serif;
+    font-size: 32px;
+    font-weight: 200;
+    line-height: 1;
+    color: var(--text);
+    transition: color 0.4s;
+  }
+  .stat-unit {
+    font-size: 10px;
+    color: var(--text-dim);
+    margin-top: 3px;
+    font-family: 'DM Mono', monospace;
+  }
+
+  /* Stress meter */
+  .stress-section {
+    padding: 0 24px;
+    margin-bottom: 20px;
+  }
+
+  .stress-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 24px;
+    transition: border-color 0.5s;
+  }
+
+  .stress-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+  }
+
+  .stress-title {
+    font-size: 10px;
+    color: var(--text-faint);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+  }
+
+  .stress-badge {
+    font-size: 11px;
+    font-weight: 500;
+    padding: 4px 12px;
+    border-radius: 999px;
+    background: var(--badge-bg, #ffffff0a);
+    color: var(--badge-color, var(--text-dim));
+    border: 1px solid var(--badge-border, var(--border));
+    transition: all 0.5s;
+  }
+
+  /* Arc meter */
+  .arc-wrapper {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+  }
+
+  #stressArc {
+    width: 200px;
+    height: 110px;
+    overflow: visible;
+  }
+
+  .stress-score-display {
+    text-align: center;
+  }
+  .stress-score-num {
+    font-family: 'Fraunces', serif;
+    font-size: 52px;
+    font-weight: 200;
+    line-height: 1;
+    color: var(--stress-color, var(--text-dim));
+    transition: color 0.5s;
+    text-shadow: 0 0 40px var(--stress-shadow, transparent);
+  }
+  .stress-score-label {
+    font-size: 11px;
+    color: var(--text-dim);
+    margin-top: 4px;
+    letter-spacing: 0.08em;
+  }
+
+  /* Progress bar style meter */
+  .meter-bar {
+    width: 100%;
+    height: 6px;
+    background: var(--border);
+    border-radius: 3px;
+    overflow: hidden;
+    margin-top: 16px;
+  }
+  .meter-fill {
+    height: 100%;
+    border-radius: 3px;
+    background: linear-gradient(to right, var(--green), var(--amber), var(--red));
+    transition: width 0.8s cubic-bezier(0.4,0,0.2,1);
+    width: 0%;
+    position: relative;
+  }
+  .meter-fill::after {
+    content: '';
+    position: absolute;
+    right: 0; top: -2px; bottom: -2px;
+    width: 4px;
+    border-radius: 2px;
+    background: white;
+    box-shadow: 0 0 8px white;
+  }
+
+  .meter-labels {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 8px;
+  }
+  .meter-labels span {
+    font-size: 9px;
+    color: var(--text-faint);
+    letter-spacing: 0.1em;
+  }
+
+  /* Control button */
+  .control-section {
+    padding: 0 24px;
+    margin-bottom: 24px;
+  }
+
+  .btn-main {
+    width: 100%;
+    padding: 18px;
+    border-radius: var(--radius-sm);
+    border: none;
+    cursor: pointer;
+    font-family: 'DM Mono', monospace;
+    font-size: 13px;
+    letter-spacing: 0.08em;
+    font-weight: 500;
+    transition: all 0.3s;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .btn-start {
+    background: var(--red);
+    color: white;
+    box-shadow: 0 4px 24px var(--red-soft);
+  }
+  .btn-start:hover { transform: translateY(-1px); box-shadow: 0 8px 32px var(--red-soft); }
+  .btn-start:active { transform: translateY(0); }
+
+  .btn-stop {
+    background: var(--surface);
+    color: var(--text-dim);
+    border: 1px solid var(--border);
+  }
+
+  /* Tips */
+  .tips-section {
+    padding: 0 24px;
+  }
+  .tip {
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .tip:last-child { border-bottom: none; }
+  .tip-icon { font-size: 16px; flex-shrink: 0; margin-top: 1px; }
+  .tip-text { font-size: 11px; color: var(--text-dim); line-height: 1.6; }
+
+  /* Loading / countdown */
+  .countdown-overlay {
+    position: absolute;
+    inset: 0;
+    background: #06060acc;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s;
+    border-radius: var(--radius);
+  }
+  .countdown-overlay.active { opacity: 1; pointer-events: all; }
+  .countdown-num {
+    font-family: 'Fraunces', serif;
+    font-size: 72px;
+    font-weight: 200;
+    color: var(--red);
+    text-shadow: 0 0 40px var(--red-soft);
+    animation: countPulse 1s ease-out infinite;
+  }
+  @keyframes countPulse {
+    0% { transform: scale(1.1); }
+    100% { transform: scale(1); opacity: 0.6; }
+  }
+  .countdown-label { font-size: 12px; color: var(--text-dim); letter-spacing: 0.1em; }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  /* Blink animation for recording */
+  @keyframes blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+  }
+  .recording-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--red);
+    display: inline-block;
+    margin-right: 6px;
+    animation: blink 1s ease-in-out infinite;
+    box-shadow: 0 0 8px var(--red);
+  }
+
+  /* History */
+  .history-section {
+    padding: 0 24px;
+    margin-bottom: 20px;
+  }
+  .history-title {
+    font-size: 10px;
+    color: var(--text-faint);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    margin-bottom: 12px;
+  }
+  .history-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .history-item {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 12px 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    animation: slideIn 0.3s ease-out;
+  }
+  @keyframes slideIn {
+    from { opacity: 0; transform: translateY(-8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .history-time { font-size: 11px; color: var(--text-faint); }
+  .history-vals { display: flex; gap: 16px; }
+  .history-val { font-size: 12px; }
+  .history-stress {
+    font-size: 11px;
+    padding: 2px 10px;
+    border-radius: 999px;
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="logo">nabız<span>stres</span></div>
+    <div class="status-pill" id="statusPill">Hazır</div>
+  </header>
+
+  <!-- Camera -->
+  <div class="camera-section">
+    <div class="camera-card">
+      <video id="videoEl" autoplay playsinline muted></video>
+      <canvas id="canvasEl" width="100" height="100"></canvas>
+
+      <div class="pulse-rings" id="pulseRings">
+        <div class="ring"></div>
+        <div class="ring"></div>
+        <div class="ring"></div>
+      </div>
+
+      <div class="camera-overlay">
+        <div class="idle-prompt" id="idlePrompt">
+          <div class="finger-icon">☝️</div>
+          <div class="idle-label">Parmağınızı kameraya ve<br>flaş ışığına bastırın</div>
+        </div>
+
+        <div class="live-readout" id="liveReadout">
+          <div class="readout-bpm">
+            <div class="val" id="bpmDisplay">--</div>
+            <div class="unit">NABIZ / DK</div>
+          </div>
+          <div class="readout-quality">
+            <div class="quality-dots">
+              <div class="qdot" id="q1"></div>
+              <div class="qdot" id="q2"></div>
+              <div class="qdot" id="q3"></div>
+              <div class="qdot" id="q4"></div>
+              <div class="qdot" id="q5"></div>
+            </div>
+            <div class="quality-label">SINYAL</div>
+          </div>
+        </div>
+
+        <div class="countdown-overlay" id="countdownOverlay">
+          <div class="countdown-num" id="countdownNum">3</div>
+          <div class="countdown-label">Parmağınızı hazırlayın</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Waveform -->
+  <div class="waveform-section">
+    <div class="waveform-card">
+      <div class="waveform-label">PPG Dalgaformu</div>
+      <canvas id="waveformCanvas"></canvas>
+    </div>
+  </div>
+
+  <!-- Stats -->
+  <div class="stats-section">
+    <div class="stat-card" id="cardHRV" style="--accent: #4a9eff">
+      <div class="stat-label">HRV (SDNN)</div>
+      <div class="stat-value" id="hrvDisplay">--</div>
+      <div class="stat-unit">ms</div>
+    </div>
+    <div class="stat-card" id="cardRMSSD" style="--accent: #2de08b">
+      <div class="stat-label">RMSSD</div>
+      <div class="stat-value" id="rmssdDisplay">--</div>
+      <div class="stat-unit">ms</div>
+    </div>
+  </div>
+
+  <!-- Stress Meter -->
+  <div class="stress-section">
+    <div class="stress-card" id="stressCard">
+      <div class="stress-header">
+        <div class="stress-title">Stres Seviyesi</div>
+        <div class="stress-badge" id="stressBadge">Ölçülüyor...</div>
+      </div>
+      <div class="arc-wrapper">
+        <div class="stress-score-display">
+          <div class="stress-score-num" id="stressScore">--</div>
+          <div class="stress-score-label">/ 100</div>
+        </div>
+      </div>
+      <div class="meter-bar">
+        <div class="meter-fill" id="meterFill"></div>
+      </div>
+      <div class="meter-labels">
+        <span>RAHAT</span>
+        <span>ORTA</span>
+        <span>YÜKSEK</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Control Button -->
+  <div class="control-section">
+    <button class="btn-main btn-start" id="btnMain" onclick="toggleMeasurement()">
+      Ölçümü Başlat
+    </button>
+  </div>
+
+  <!-- History -->
+  <div class="history-section" id="historySection" style="display:none">
+    <div class="history-title">Son Ölçümler</div>
+    <div class="history-list" id="historyList"></div>
+  </div>
+
+  <!-- Tips -->
+  <div class="tips-section">
+    <div class="tip">
+      <div class="tip-icon">💡</div>
+      <div class="tip-text">Parmağınızı hem kamera hem de flaş ışığı üzerine tam olarak kapatın. Işık sızmaması sinyal kalitesini artırır.</div>
+    </div>
+    <div class="tip">
+      <div class="tip-icon">🤫</div>
+      <div class="tip-text">Ölçüm sırasında sakin tutun, derin nefes alın. Hareket sinyali bozar.</div>
+    </div>
+    <div class="tip">
+      <div class="tip-icon">⏱️</div>
+      <div class="tip-text">Doğru HRV için en az 30 saniye ölçüm gereklidir. 60 saniye idealdir.</div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════
+// PPG SIGNAL PROCESSOR
+// ═══════════════════════════════════════════════
+
+const VIDEO = document.getElementById('videoEl');
+const CANVAS = document.getElementById('canvasEl');
+const CTX = CANVAS.getContext('2d');
+const WAVEFORM = document.getElementById('waveformCanvas');
+const WCTX = WAVEFORM.getContext('2d');
+
+let stream = null;
+let animFrame = null;
+let isRunning = false;
+let isCalibrating = false;
+
+// Signal buffers
+const BUFFER_SIZE = 512;
+const rawSignal = [];      // raw red channel values
+const filteredSignal = []; // bandpass filtered
+const rrIntervals = [];    // R-R intervals in ms
+const peakTimes = [];      // timestamps of detected peaks
+
+let lastPeakTime = 0;
+let frameCount = 0;
+let measureStart = 0;
+const FPS_TARGET = 30;
+let lastFrameTime = 0;
+let estimatedFPS = 30;
+let signalQuality = 0;
+
+// Bandpass filter state (0.5–4 Hz for heart rate)
+let bpState = { x1:0, x2:0, y1:0, y2:0 };
+
+function bandpassFilter(x) {
+  // Simple IIR bandpass ~ 0.5-4 Hz at 30fps
+  const a0 = 0.1318, a1 = 0, a2 = -0.1318;
+  const b1 = 1.6879, b2 = -0.7363;
+  const y = a0*x + a1*bpState.x1 + a2*bpState.x2 + b1*bpState.y1 - b2*bpState.y2;
+  bpState.x2 = bpState.x1; bpState.x1 = x;
+  bpState.y2 = bpState.y1; bpState.y1 = y;
+  return y;
+}
+
+// Moving average for smoothing
+function movingAvg(arr, n) {
+  if (arr.length < n) return arr[arr.length-1] || 0;
+  return arr.slice(-n).reduce((a,b)=>a+b,0)/n;
+}
+
+// Detect peaks in filtered signal
+function detectPeak(signal, idx) {
+  if (signal.length < 5) return false;
+  const win = 5;
+  const s = signal;
+  const i = s.length - 1;
+  if (i < win) return false;
+  const v = s[i-2];
+  // local maximum with threshold
+  const neighbors = s.slice(Math.max(0,i-win), i+1);
+  const max = Math.max(...neighbors);
+  const min = Math.min(...neighbors);
+  const range = max - min;
+  if (range < 0.3) return false; // too flat
+  return v === max && v > s[i-4] && v > s[i] && range > 0.5;
+}
+
+// Calculate stats from RR intervals
+function calcHRV(rr) {
+  if (rr.length < 3) return { bpm: 0, sdnn: 0, rmssd: 0 };
+  const mean = rr.reduce((a,b)=>a+b,0)/rr.length;
+  const bpm = Math.round(60000 / mean);
+
+  // SDNN
+  const variance = rr.reduce((a,b)=>a+(b-mean)**2,0)/(rr.length-1);
+  const sdnn = Math.round(Math.sqrt(variance));
+
+  // RMSSD
+  let sqDiffs = 0;
+  for (let i=1;i<rr.length;i++) sqDiffs += (rr[i]-rr[i-1])**2;
+  const rmssd = Math.round(Math.sqrt(sqDiffs/(rr.length-1)));
+
+  return { bpm, sdnn, rmssd };
+}
+
+// Map HRV to stress score (0-100)
+// Higher HRV = lower stress; RMSSD > 60ms = very low stress
+function hrvToStress(rmssd, sdnn) {
+  if (!rmssd || !sdnn) return null;
+  // Normalize: RMSSD 10ms → stress 90, 80ms → stress 15
+  const rmssdScore = Math.max(0, Math.min(100, 100 - (rmssd - 10) * 1.2));
+  const sdnnScore  = Math.max(0, Math.min(100, 100 - (sdnn - 15) * 0.9));
+  return Math.round(rmssdScore * 0.6 + sdnnScore * 0.4);
+}
+
+// ═══════════════════════════════════════════════
+// WAVEFORM RENDERER
+// ═══════════════════════════════════════════════
+
+function resizeWaveform() {
+  const dpr = window.devicePixelRatio || 1;
+  const rect = WAVEFORM.getBoundingClientRect();
+  WAVEFORM.width = rect.width * dpr;
+  WAVEFORM.height = rect.height * dpr;
+  WCTX.scale(dpr, dpr);
+}
+
+function drawWaveform() {
+  const w = WAVEFORM.getBoundingClientRect().width;
+  const h = WAVEFORM.getBoundingClientRect().height;
+  WCTX.clearRect(0, 0, w, h);
+
+  if (filteredSignal.length < 10) {
+    // Draw flat line
+    WCTX.strokeStyle = '#ffffff0a';
+    WCTX.lineWidth = 1.5;
+    WCTX.beginPath();
+    WCTX.moveTo(0, h/2);
+    WCTX.lineTo(w, h/2);
+    WCTX.stroke();
+    return;
+  }
+
+  const displaySamples = Math.min(filteredSignal.length, 150);
+  const sig = filteredSignal.slice(-displaySamples);
+  const min = Math.min(...sig), max = Math.max(...sig);
+  const range = max - min || 1;
+
+  // Gradient
+  const grad = WCTX.createLinearGradient(0, 0, w, 0);
+  grad.addColorStop(0, '#e8392a11');
+  grad.addColorStop(0.5, '#e8392acc');
+  grad.addColorStop(1, '#e8392a33');
+
+  WCTX.strokeStyle = grad;
+  WCTX.lineWidth = 2;
+  WCTX.lineJoin = 'round';
+  WCTX.lineCap = 'round';
+  WCTX.shadowColor = '#e8392a';
+  WCTX.shadowBlur = 6;
+
+  WCTX.beginPath();
+  sig.forEach((v, i) => {
+    const x = (i / (displaySamples-1)) * w;
+    const y = h - ((v - min) / range) * (h * 0.8) - h * 0.1;
+    i === 0 ? WCTX.moveTo(x, y) : WCTX.lineTo(x, y);
+  });
+  WCTX.stroke();
+  WCTX.shadowBlur = 0;
+}
+
+// ═══════════════════════════════════════════════
+// UI UPDATES
+// ═══════════════════════════════════════════════
+
+function updateUI(stats) {
+  const { bpm, sdnn, rmssd } = stats;
+  const stress = hvStress(rmssd, sdnn);
+
+  // BPM
+  if (bpm > 30 && bpm < 220) {
+    document.getElementById('bpmDisplay').textContent = bpm;
+  }
+
+  // HRV
+  if (sdnn > 0) {
+    document.getElementById('hrvDisplay').textContent = sdnn;
+    document.getElementById('cardHRV').classList.add('active');
+  }
+  if (rmssd > 0) {
+    document.getElementById('rmssdDisplay').textContent = rmssd;
+    document.getElementById('cardRMSSD').classList.add('active');
+  }
+
+  // Stress
+  if (stress !== null) {
+    updateStressUI(stress);
+  }
+
+  // Signal quality dots
+  const dots = [1,2,3,4,5].map(i=>document.getElementById('q'+i));
+  const litCount = Math.round(signalQuality * 5);
+  dots.forEach((d,i)=> d.classList.toggle('lit', i < litCount));
+}
+
+function hvStress(rmssd, sdnn) {
+  return hvToStressInner(rmssd, sdnn);
+}
+function hvToStressInner(rmssd, sdnn) {
+  return hrvToStress(rmssd, sdnn);
+}
+
+let lastStress = null;
+function updateStressUI(stress) {
+  const scoreEl = document.getElementById('stressScore');
+  const badgeEl = document.getElementById('stressBadge');
+  const fillEl  = document.getElementById('meterFill');
+
+  // Animate number
+  if (lastStress === null) lastStress = stress;
+  const diff = stress - lastStress;
+  lastStress = stress;
+
+  scoreEl.textContent = stress;
+  fillEl.style.width = stress + '%';
+
+  let label, color, shadow, bg, bc;
+  if (stress < 30) {
+    label = '🟢 Rahat'; color = '#2de08b'; shadow = '#2de08b44';
+    bg = '#2de08b11'; bc = '#2de08b44';
+  } else if (stress < 55) {
+    label = '🟡 Hafif Stres'; color = '#f5a623'; shadow = '#f5a62344';
+    bg = '#f5a62311'; bc = '#f5a62344';
+  } else if (stress < 75) {
+    label = '🟠 Orta Stres'; color = '#ff6b35'; shadow = '#ff6b3544';
+    bg = '#ff6b3511'; bc = '#ff6b3544';
+  } else {
+    label = '🔴 Yüksek Stres'; color = '#e8392a'; shadow = '#e8392a66';
+    bg = '#e8392a15'; bc = '#e8392a55';
+  }
+
+  scoreEl.style.setProperty('--stress-color', color);
+  scoreEl.style.setProperty('--stress-shadow', shadow);
+  scoreEl.style.color = color;
+  scoreEl.style.textShadow = `0 0 40px ${shadow}`;
+  badgeEl.textContent = label;
+  badgeEl.style.setProperty('--badge-color', color);
+  badgeEl.style.setProperty('--badge-bg', bg);
+  badgeEl.style.setProperty('--badge-border', bc);
+}
+
+// ═══════════════════════════════════════════════
+// MAIN MEASUREMENT LOOP
+// ═══════════════════════════════════════════════
+
+function measureLoop(timestamp) {
+  if (!isRunning) return;
+
+  // FPS estimation
+  if (lastFrameTime) {
+    const dt = timestamp - lastFrameTime;
+    estimatedFPS = 0.9 * estimatedFPS + 0.1 * (1000/dt);
+  }
+  lastFrameTime = timestamp;
+
+  // Extract red channel
+  CTX.drawImage(VIDEO, 0, 0, 100, 100);
+  const pixels = CTX.getImageData(0, 0, 100, 100).data;
+
+  let rSum = 0, gSum = 0, bSum = 0, n = pixels.length/4;
+  for (let i=0; i<pixels.length; i+=4) {
+    rSum += pixels[i];
+    gSum += pixels[i+1];
+    bSum += pixels[i+2];
+  }
+  const rMean = rSum/n/255;
+  const gMean = gSum/n/255;
+  const bMean = bSum/n/255;
+
+  // Signal quality: finger coverage check
+  // When finger on camera: R high, G+B very low
+  const isCovered = rMean > 0.3 && gMean < 0.3 && bMean < 0.25;
+  const redness = rMean - (gMean + bMean)*0.5;
+  signalQuality = isCovered ? Math.min(1, redness * 2.5) : Math.max(0, signalQuality - 0.05);
+
+  if (!isCalibrating) {
+    rawSignal.push(rMean);
+    if (rawSignal.length > BUFFER_SIZE) rawSignal.shift();
+
+    // Normalize against moving baseline
+    const baseline = movingAvg(rawSignal, 60);
+    const normalized = (rMean - baseline) * 10;
+
+    const filtered = bandpassFilter(normalized);
+    filteredSignal.push(filtered);
+    if (filteredSignal.length > BUFFER_SIZE) filteredSignal.shift();
+
+    // Peak detection
+    if (filteredSignal.length > 10 && detectPeak(filteredSignal, frameCount)) {
+      const now = performance.now();
+      if (lastPeakTime > 0) {
+        const rr = now - lastPeakTime;
+        if (rr > 300 && rr < 1500) { // physiologically valid (40-200 BPM)
+          rrIntervals.push(rr);
+          if (rrIntervals.length > 60) rrIntervals.shift();
+          peakTimes.push(now);
+          if (peakTimes.length > 60) peakTimes.shift();
+          // Pulse ring flash
+          triggerPulse();
+        }
+      }
+      lastPeakTime = now;
+    }
+
+    // Update stats every ~1s
+    frameCount++;
+    if (frameCount % 30 === 0) {
+      if (rrIntervals.length >= 3) {
+        const stats = calcHRV(rrIntervals);
+        updateUI(stats);
+      }
+    }
+  }
+
+  drawWaveform();
+  animFrame = requestAnimationFrame(measureLoop);
+}
+
+let pulseTimeout = null;
+function triggerPulse() {
+  const rings = document.getElementById('pulseRings');
+  rings.classList.add('visible');
+  clearTimeout(pulseTimeout);
+  pulseTimeout = setTimeout(()=>rings.classList.remove('visible'), 800);
+}
+
+// ═══════════════════════════════════════════════
+// CAMERA MANAGEMENT
+// ═══════════════════════════════════════════════
+
+async function startCamera() {
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({
+      video: {
+        facingMode: 'environment', // rear camera
+        width: { ideal: 640 },
+        height: { ideal: 480 },
+        frameRate: { ideal: 30, max: 60 },
+      }
+    });
+    VIDEO.srcObject = stream;
+    await VIDEO.play();
+
+    // Try to enable torch/flash
+    const track = stream.getVideoTracks()[0];
+    try {
+      await track.applyConstraints({ advanced: [{ torch: true }] });
+    } catch(e) {
+      console.log('Torch not supported, continuing without:', e.message);
+    }
+
+    return true;
+  } catch(e) {
+    alert('Kamera erişimi reddedildi. Lütfen tarayıcı izinlerini kontrol edin.\n\n' + e.message);
+    return false;
+  }
+}
+
+function stopCamera() {
+  if (stream) {
+    stream.getTracks().forEach(t => t.stop());
+    stream = null;
+  }
+  VIDEO.srcObject = null;
+}
+
+// ═══════════════════════════════════════════════
+// COUNTDOWN
+// ═══════════════════════════════════════════════
+
+function runCountdown(n) {
+  return new Promise(resolve => {
+    const overlay = document.getElementById('countdownOverlay');
+    const numEl = document.getElementById('countdownNum');
+    overlay.classList.add('active');
+    let count = n;
+    numEl.textContent = count;
+    const interval = setInterval(() => {
+      count--;
+      if (count <= 0) {
+        clearInterval(interval);
+        overlay.classList.remove('active');
+        resolve();
+      } else {
+        numEl.textContent = count;
+      }
+    }, 1000);
+  });
+}
+
+// ═══════════════════════════════════════════════
+// TOGGLE MEASUREMENT
+// ═══════════════════════════════════════════════
+
+async function toggleMeasurement() {
+  if (!isRunning) {
+    await startMeasurement();
+  } else {
+    stopMeasurement();
+  }
+}
+
+async function startMeasurement() {
+  const btn = document.getElementById('btnMain');
+  btn.disabled = true;
+  btn.textContent = 'Kamera açılıyor...';
+
+  const ok = await startCamera();
+  if (!ok) {
+    btn.disabled = false;
+    btn.textContent = 'Ölçümü Başlat';
+    return;
+  }
+
+  resizeWaveform();
+
+  // Countdown
+  await runCountdown(3);
+
+  // Reset state
+  rawSignal.length = 0;
+  filteredSignal.length = 0;
+  rrIntervals.length = 0;
+  peakTimes.length = 0;
+  lastPeakTime = 0;
+  frameCount = 0;
+  bpState = {x1:0,x2:0,y1:0,y2:0};
+  lastStress = null;
+  signalQuality = 0;
+
+  isCalibrating = true;
+  setTimeout(() => { isCalibrating = false; }, 2000); // 2s calibration
+
+  isRunning = true;
+  measureStart = Date.now();
+
+  // Update UI
+  document.getElementById('idlePrompt').classList.add('hidden');
+  document.getElementById('liveReadout').classList.add('visible');
+  document.getElementById('statusPill').textContent = '⏺ Ölçülüyor';
+  document.getElementById('statusPill').classList.add('active');
+
+  btn.disabled = false;
+  btn.className = 'btn-main btn-stop';
+  btn.innerHTML = '<span class="recording-dot"></span>Durdur';
+
+  requestAnimationFrame(measureLoop);
+}
+
+function stopMeasurement() {
+  isRunning = false;
+  cancelAnimationFrame(animFrame);
+  stopCamera();
+
+  // Save to history if we have data
+  if (rrIntervals.length >= 3) {
+    const stats = calcHRV(rrIntervals);
+    const stress = hrvToStress(stats.rmssd, stats.sdnn);
+    saveHistory(stats, stress);
+  }
+
+  // Update UI
+  document.getElementById('idlePrompt').classList.remove('hidden');
+  document.getElementById('liveReadout').classList.remove('visible');
+  document.getElementById('pulseRings').classList.remove('visible');
+  document.getElementById('statusPill').textContent = 'Hazır';
+  document.getElementById('statusPill').classList.remove('active');
+
+  const btn = document.getElementById('btnMain');
+  btn.className = 'btn-main btn-start';
+  btn.textContent = 'Tekrar Ölç';
+}
+
+// ═══════════════════════════════════════════════
+// HISTORY
+// ═══════════════════════════════════════════════
+
+const measureHistory = [];
+
+function saveHistory(stats, stress) {
+  const now = new Date();
+  const timeStr = now.toLocaleTimeString('tr-TR', {hour:'2-digit',minute:'2-digit'});
+  measureHistory.unshift({ time: timeStr, bpm: stats.bpm, hrv: stats.sdnn, stress });
+  if (measureHistory.length > 5) measureHistory.pop();
+  renderHistory();
+}
+
+function renderHistory() {
+  const section = document.getElementById('historySection');
+  const list = document.getElementById('historyList');
+  section.style.display = '';
+
+  list.innerHTML = measureHistory.map(m => {
+    let stressLabel, stressColor, stressBg;
+    if (!m.stress || m.stress < 30) {
+      stressLabel='Rahat'; stressColor='#2de08b'; stressBg='#2de08b15';
+    } else if (m.stress < 55) {
+      stressLabel='Hafif'; stressColor='#f5a623'; stressBg='#f5a62315';
+    } else if (m.stress < 75) {
+      stressLabel='Orta'; stressColor='#ff6b35'; stressBg='#ff6b3515';
+    } else {
+      stressLabel='Yüksek'; stressColor='#e8392a'; stressBg='#e8392a15';
+    }
+    return `<div class="history-item">
+      <div class="history-time">${m.time}</div>
+      <div class="history-vals">
+        <span class="history-val" style="color:#e8392a">${m.bpm} bpm</span>
+        <span class="history-val" style="color:#4a9eff">HRV ${m.hrv}ms</span>
+      </div>
+      <span class="history-stress" style="color:${stressColor};background:${stressBg};border:1px solid ${stressColor}44">${stressLabel}</span>
+    </div>`;
+  }).join('');
+}
+
+// ═══════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════
+
+window.addEventListener('resize', resizeWaveform);
+resizeWaveform();
+drawWaveform();
+
+// PWA install prompt
+let deferredPrompt;
+window.addEventListener('beforeinstallprompt', e => {
+  e.preventDefault();
+  deferredPrompt = e;
+});
+</script>
+</body>
+</html>
